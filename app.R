@@ -90,8 +90,8 @@ stationOverviewFigureList <- list("Species composition" = "speciesCompositionPlo
 
 stationMapList <- list("Total catch map" = "catchMap", "Catch composition map" = "catchCompMap")
 
-dbPath <- "~/Desktop/IMR_db.monetdb" 
-dbIndexPath <- "~/Desktop/dbIndex.rda"
+dbPath <- "/data/duckdb/newdb.monetdb" 
+dbIndexPath <- "/data/duckdb/dbIndex.rda"
 
 if(file.exists(dbPath)) {
   message("dbPath found. Enabling server version.")
@@ -843,7 +843,7 @@ server <- shinyServer(function(input, output, session) {
         
         # Running the indexing below, saving to a file and specifying dbIndexPath in Settings section is a time-saver, not a necessity. 
         if(!exists("index")) {
-          index <<- list()
+          index <- list()
           index$missiontypename <- rv$inputData$mission %>% lazy_dt() %>% select(missiontypename) %>% distinct() %>% pull() %>% sort()
           index$cruise <- rv$inputData$mission %>% lazy_dt() %>% select(cruise) %>% distinct() %>% pull() %>% sort()
           index$year <- rv$inputData$mission %>% lazy_dt() %>% select(startyear) %>% distinct() %>% pull() %>% sort()
@@ -852,6 +852,8 @@ server <- shinyServer(function(input, output, session) {
           index$platformname <- rv$inputData$stnall %>% lazy_dt() %>% select(platformname) %>% distinct() %>% pull() %>% sort()
           index$serialnumber <- rv$inputData$stnall %>% lazy_dt() %>% select(serialnumber) %>% distinct() %>% pull() %>% sort()
           index$gear <- rv$inputData$stnall %>% lazy_dt() %>% select(gear) %>% distinct() %>% pull() %>% sort()
+          # Put in global
+          index <<- index
         }
         
         updateFilterform(loadDb = TRUE)
