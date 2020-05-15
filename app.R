@@ -52,8 +52,6 @@ if (!"MonetDBLite" %in% installed.packages()[,"Package"]) {
 source("R/other_functions.R", encoding = "utf-8")
 source("R/processBiotic_functions.R", encoding = "utf-8")
 source("R/figure_functions.R", encoding = "utf-8")
-# source("R/sql_functions.R", encoding = "utf-8")
-
 
 ##____________________
 ## User interface ####
@@ -154,7 +152,7 @@ sidebar <- dashboardSidebar(sidebarMenu(
            menuSubItem("Examine data", tabName = "indallExamine")
   ),
   
-  menuItem("Hierarchical data tables", icon = icon("sort-by-attributes", lib = "glyphicon"),
+  menuItem("Hierarchical data tables", tabName = "bioticTables", icon = icon("sort-by-attributes", lib = "glyphicon"),
            menuSubItem("Station data", icon = icon("bar-chart-o"), tabName = "fishstationExamine"),
            menuSubItem("Catch data", icon = icon("bar-chart-o"), tabName = "catchsampleExamine"),
            menuSubItem("Individual data", icon = icon("bar-chart-o"), tabName = "individualExamine"),
@@ -531,14 +529,11 @@ body <-
               fluidRow(
                 box(title = "Individual sample overview", width = 12, status = "info", 
                     solidHeader = TRUE,
-                    DT::dataTableOutput("individualSummaryTable")
+                    DT::dataTableOutput("individualSummaryTable"),
+                    br(),
+                    box(title = "Median length and distribution of species with > 10 length measurements", width = 12, status = "info", solidHeader = TRUE, plotOutput("indLengthPlot")),
+                    box(title = "Median weight and distribution of species with > 10 weight measurements", width = 12, status = "info", solidHeader = TRUE, plotOutput("indWeightPlot"))
                 )
-                # box(title = "Ricker thing", width = 12, status = "info",
-                #     solidHeader = TRUE,
-                #     # plotOutput("rickerPlot")
-                #     verbatimTextOutput("test")
-                # ),
-                
               )
       ),
       
@@ -660,10 +655,10 @@ body <-
       ## NMD data tab ####
       
       tabItem("missionExamine", DT::dataTableOutput("missionTable")),
-      # tabItem("fishstationExamine", DT::dataTableOutput("fishstation")),
-      # tabItem("catchsampleExamine", DT::dataTableOutput("catchsample")),
-      # tabItem("individualExamine", DT::dataTableOutput("individualTable")),
-      # tabItem("agedeterminationExamine", DT::dataTableOutput("agedeterminationTable")),
+      tabItem("fishstationExamine", DT::dataTableOutput("fishstation")),
+      tabItem("catchsampleExamine", DT::dataTableOutput("catchsample")),
+      tabItem("individualExamine", DT::dataTableOutput("individualTable")),
+      tabItem("agedeterminationExamine", DT::dataTableOutput("agedeterminationTable")),
       
       ##........................
       ## Export figures tab ####
@@ -1051,73 +1046,89 @@ server <- shinyServer(function(input, output, session) {
     )
   })
   
-  # output$fishstation <- DT::renderDataTable({
-  #   DT::datatable(rv$fishstation, 
-  #                 options = list(scrollX = TRUE, 
-  #                                pageLength = 20
-  #                 ) 
-  #   ) %>% formatRound(c("longitudestart", "latitudestart", "distance"))
-  # })
-  # 
-  # output$catchsample <- DT::renderDataTable({
-  #   DT::datatable(rv$catchsample, 
-  #                 options = list(scrollX = TRUE, 
-  #                                pageLength = 20
-  #                 ) 
-  #   ) %>% formatRound(c("catchweight", "lengthsampleweight"))
-  # })
-  # 
-  # output$individualTable <- DT::renderDataTable({
-  #   DT::datatable(rv$individual, 
-  #                 options = list(scrollX = TRUE, 
-  #                                pageLength = 20
-  #                 ) 
-  #   ) 
-  # })
-  # 
-  # output$agedeterminationTable <- DT::renderDataTable({
-  #   DT::datatable(rv$agedetermination,
-  #                 options = list(scrollX = TRUE,
-  #                                pageLength = 20
-  #                 )
-  #   )
-  # })
+  ### NMD data tables ####
   
+  observeEvent(input$tabs, {
+    
+    ## Fish station ####
+    if(input$tabs == "fishstationExamine") {
+      
+      cols <- colnames(rv$stnall)[colnames(rv$stnall) %in% RstoxData::xsdObjects$nmdbioticv3.xsd$tableHeaders$fishstation]
+      
+      rv$fishstation <- rv$stnall %>% lazy_dt() %>% 
+        select(cols) %>% 
+        distinct() %>% collect()
+      
+      output$fishstation <- DT::renderDataTable({
+        
+        DT::datatable(rv$fishstation,
+                      options = list(scrollX = TRUE,
+                                     pageLength = 20
+                      )
+        ) %>% formatRound(c("longitudestart", "latitudestart", "distance"))
+      })
+    }
+    
+    ## Catch sample ####
+    if(input$tabs == "catchsampleExamine") {
+      
+      cols <- colnames(rv$stnall)[colnames(rv$stnall) %in% RstoxData::xsdObjects$nmdbioticv3.xsd$tableHeaders$catchsample]
+      
+      rv$catchsample <- rv$stnall %>% lazy_dt() %>% 
+        select(cols) %>% 
+        distinct() %>% collect()
+      
+      output$catchsample <- DT::renderDataTable({
+        
+        DT::datatable(rv$catchsample,
+                      options = list(scrollX = TRUE,
+                                     pageLength = 20
+                      )
+        ) %>% formatRound(c("catchweight", "lengthsampleweight"))
+      })
+    }
+    
+    ## Individual ####
+    if(input$tabs == "individualExamine") {
+      
+      cols <- colnames(rv$indall)[colnames(rv$indall) %in% RstoxData::xsdObjects$nmdbioticv3.xsd$tableHeaders$individual]
+      
+      rv$individual <- rv$indall %>% lazy_dt() %>% 
+        select(cols) %>% 
+        distinct() %>% collect()
+      
+      output$individualTable <- DT::renderDataTable({
+        DT::datatable(rv$individual,
+                      options = list(scrollX = TRUE,
+                                     pageLength = 20
+                      )
+        )
+      })
+    }
+    
+    ## Age ####
+    if(input$tabs == "agedeterminationExamine") {
+      
+      cols <- colnames(rv$indall)[colnames(rv$indall) %in% RstoxData::xsdObjects$nmdbioticv3.xsd$tableHeaders$agedetermination]
+      
+      if("age" %in% cols) {
+        rv$agedetermination <- rv$indall %>% lazy_dt() %>% 
+          select(cols) %>% 
+          distinct() %>% collect()
+      } else {
+        rv$agedetermination <- NULL
+      }
+      
+      output$agedeterminationTable <- DT::renderDataTable({
+        DT::datatable(rv$agedetermination,
+                      options = list(scrollX = TRUE,
+                                     pageLength = 20
+                      )
+        )
+      })
+    }
+  })
   
-  #..................
-  ## Station map ####
-  
-  # observeEvent(req(input$file1), {
-  #   
-  #   if (!input$performanceMode) {
-  #     output$stationMap <- renderLeaflet({
-  #       
-  #       tmp <- rv$stnall %>% 
-  #         select(missiontype, startyear, platform, platformname, missionnumber, missionid, 
-  #                serialnumber, latitudestart, longitudestart) %>% 
-  #         filter(!is.na(longitudestart) & !is.na(latitudestart)) %>% distinct() 
-  #       
-  #       leaflet::leaflet(tmp) %>% 
-  #         addTiles(urlTemplate = "https://server.arcgisonline.com/ArcGIS/rest/services/Ocean_Basemap/MapServer/tile/{z}/{y}/{x}",
-  #                  attribution = "Tiles &copy; Esri &mdash; Sources: GEBCO, NOAA, CHS, OSU, UNH, CSUMB, National Geographic, DeLorme, NAVTEQ, and Esri") %>% 
-  #         addRectangles(
-  #           lng1 = input$subLon[1], lat1 = input$subLat[1], lng2 = input$subLon[2], lat2 = input$subLat[2],
-  #           fillColor = "transparent") %>% 
-  #         addCircleMarkers(lat = ~ latitudestart, 
-  #                          lng = ~ longitudestart, 
-  #                          weight = 1, radius = 2, 
-  #                          popup = ~as.character(platformname), 
-  #                          label = ~as.character(serialnumber), 
-  #                          fillOpacity = 0.5,
-  #                          clusterOptions = markerClusterOptions()
-  #         )
-  #     })
-  #   } else {
-  #     output$stationMap <- NULL
-  #   }
-  #   
-  # })
-  # 
   ##......................
   ## Stn data figures ####
   
@@ -1215,36 +1226,14 @@ server <- shinyServer(function(input, output, session) {
                          Maturationstage = {if("maturationstage" %in% names(.)) sum(!is.na(maturationstage)) else 0}, 
                          Specialstage = {if("specialstage" %in% names(.)) sum(!is.na(specialstage)) else 0}, 
                          Age = {if("age" %in% names(.)) sum(!is.na(age)) else 0}
-        ) %>% collect() 
+        ) %>% arrange(-Total) %>% collect() 
       
       output$individualSummaryTable <- DT::renderDataTable({
         DT::datatable(indSumTab, options = list(searching = FALSE))
       })
       
-      
-      # meanIndLStn <- rv$indall %>% filter(!is.na(length)) %>% group_by(cruise, startyear, serialnumber, longitudestart, latitudestart, commonname) %>% summarise(meanLength = mean(length))
-      # 
-      # meanIndL <- meanIndLStn %>% group_by(commonname) %>% summarise(mean = mean(meanLength), sd = sd(meanLength), se = se(meanLength), n = length(meanLength))
-      # 
-      # ggplot(tmp, aes(x = commonname, y = meanLength)) + geom_point()
-      # 
-      # tmp <- rv$indall %>% filter(!is.na(length) & !is.na(individualweight)) %>% group_by(commonname) %>% filter(n() > 10) %>% summarise(ricker = sd(log(individualweight))/sd(log(length)), n = n())
-      #
-      # output$rickerPlot <- renderPlot({
-      #   
-      #   ggplot() + 
-      #     geom_hline(yintercept = 3) + 
-      #     geom_text(data = tmp, aes(x = commonname, y = Inf, label = n), vjust = 1) +
-      #     geom_point(data = tmp, aes(x = commonname, y = ricker)) + 
-      #     ylab("Sd(log(sum(weight)))/Sd(log(sum(length)))") +
-      #     xlab("Species database name") +
-      #     theme_classic(base_size = 14) +
-      #     theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
-      #   
-      # })
-      
-      # Mean individual length & sex
-      # Mean length - depth
+      output$indLengthPlot <- renderPlot(indLengthPlot(indall = rv$indall))
+      output$indWeightPlot <- renderPlot(indWeightPlot(indall = rv$indall))
     } 
   })
   
@@ -1315,13 +1304,13 @@ server <- shinyServer(function(input, output, session) {
             
             if (input$lwPlotLogSwitch) {
               p <- p + 
-                scale_x_log10(paste0("Total length [log10(", input$lengthUnit, ")]")) +
+                scale_x_log10(paste0("Length [log10(", input$lengthUnit, ")]")) +
                 scale_y_log10(paste0("Weight [log10(", input$weightUnit, ")]")) + 
                 geom_smooth(data = lwDat, aes(x = length, y = individualweight), method = "lm", se = TRUE) 
               
             } else {
               p <- p + 
-                scale_x_continuous(paste0("Total length (", input$lengthUnit, ")")) +
+                scale_x_continuous(paste0("Length (", input$lengthUnit, ")")) +
                 scale_y_continuous(paste0("Weight (", input$weightUnit, ")")) + 
                 stat_function(data = 
                                 data.frame(x = range(lwDat$length)), aes(x),
