@@ -118,7 +118,7 @@ dropdownMenu(type = "notifications", headerText = scan("VERSION", what = "charac
              notificationItem("Data fields", icon = icon("question-circle"), status = "info", href = "http://www.imr.no/formats/nmdbiotic/v3/nmdbioticv3_en.html"),
              notificationItem("Data types and codes", icon = icon("question-circle"), status = "info", href = "https://hinnsiden.no/tema/forskning/PublishingImages/Sider/SPD-gruppen/H%C3%A5ndbok%205.0%20juli%202019.pdf#search=h%C3%A5ndbok%20pr%C3%B8vetaking"),
              notificationItem("Download NMD data", icon = icon("download"), status = "info", href = "https://datasetexplorer.hi.no/"),
-             notificationItem("Data policy", icon = icon("creative-commons"), status = "info", href = "http://www.imr.no/filarkiv/2013/03/datapolitikk_nmd.pdf/nb-no")
+             notificationItem("Data policy", icon = icon("creative-commons"), status = "info", href = "https://www.hi.no/resources/Data-policy-HI.pdf")
 )
 )
 
@@ -233,7 +233,6 @@ body <-
                          
                          strong("Drop excess data:"),
                          checkboxInput("removeEmpty", "Remove empty columns", TRUE),
-                         checkboxInput("coreDataOnly", "Keep only important columns", FALSE),
                          
                          radioButtons("lengthUnit", "Fish length unit:",
                                       c("Millimeter" = "mm",
@@ -304,7 +303,7 @@ body <-
                          actionButton(inputId = "Subset", label = "Subset"),
                          actionButton(inputId = "Reset", label = "Reset")
                          
-                         , verbatimTextOutput("test") # For debugging
+                         #, verbatimTextOutput("test") # For debugging
                          
                        ),
                        
@@ -355,8 +354,7 @@ body <-
                            
                            strong("Drop excess data:"),
                            fluidRow(
-                             column(4, checkboxInput("removeEmpty", "Remove empty columns", TRUE)),
-                             column(4, checkboxInput("coreDataOnly", "Keep only important columns", FALSE))
+                             column(4, checkboxInput("removeEmpty", "Remove empty columns", TRUE))
                            ),
                            
                            fluidRow(
@@ -445,10 +443,14 @@ body <-
                          condition = "output.fetchedDb == false",
                          box(
                            title = "All data in the database", width = NULL, status = "primary",
-                           valueBoxOutput("EstStationsBox", width = 6),
+                           textOutput("snapshotTime"),
+                           br(),
                            valueBoxOutput("EstYearsBox", width = 6),
-                           valueBoxOutput("EstGearsBox", width = 6),
                            valueBoxOutput("EstSpeciesBox", width = 6),
+                           valueBoxOutput("EstGearsBox", width = 6),
+                           valueBoxOutput("EstVesselsBox", width = 6),
+                           valueBoxOutput("EstStationsBox", width = 6),
+                           valueBoxOutput("EstMeasuredBox", width = 6),
                            valueBoxOutput("EstDateStartBox", width = 6),
                            valueBoxOutput("EstDateEndBox", width = 6)
                            # ,verbatimTextOutput("test") # For debugging
@@ -795,12 +797,12 @@ server <- shinyServer(function(input, output, session) {
     tryCatch({
       
       if (length(input$file1[[1]]) > 1) {
-        rv$inputData <- processBioticFiles(files = input$file1$datapath, lengthUnit = input$lengthUnit, weightUnit = input$weightUnit, removeEmpty = input$removeEmpty, coreDataOnly = input$coreDataOnly, convertColumns = TRUE)
+        rv$inputData <- processBioticFiles(files = input$file1$datapath, removeEmpty = input$removeEmpty, convertColumns = TRUE, returnOriginal = FALSE)
       } else {
         if(tolower(gsub("^.+\\.", "", input$file1$name)) == "rds") {
           rv$inputData <- readRDS(file = input$file1$datapath)
         } else {
-          rv$inputData <- processBioticFile(file = input$file1$datapath, lengthUnit = input$lengthUnit, weightUnit = input$weightUnit, removeEmpty = input$removeEmpty, coreDataOnly = input$coreDataOnly, convertColumns = TRUE)
+          rv$inputData <- processBioticFile(file = input$file1$datapath, removeEmpty = input$removeEmpty, convertColumns = TRUE, returnOriginal = FALSE)
         }
       }
     },
@@ -836,18 +838,21 @@ server <- shinyServer(function(input, output, session) {
         rv$inputData$indall <- dplyr::tbl(con_db, "indall")
         rv$inputData$mission <- dplyr::tbl(con_db, "mission")
         
-        # Running the indexing below, saving to a file and specifying dbIndexPath in Settings section is a time-saver, not a necessity. 
+        # Copy the indexing script from BioticExplorerServer::indexDatabase. 
         if(!exists("index")) {
           index <- list()
-          index$missiontypename <- rv$inputData$mission %>% lazy_dt() %>% select(missiontypename) %>% distinct() %>% pull() %>% sort()
-          index$cruise <- rv$inputData$mission %>% lazy_dt() %>% select(cruise) %>% distinct() %>% pull() %>% sort()
-          index$year <- rv$inputData$mission %>% lazy_dt() %>% select(startyear) %>% distinct() %>% pull() %>% sort()
-          index$nstations <- rv$inputData$stnall %>% lazy_dt() %>% select(missionid, startyear, serialnumber) %>% distinct() %>% count() %>% pull()
-          index$commonname <- rv$inputData$stnall %>% lazy_dt() %>% select(commonname) %>% distinct() %>% pull() %>% sort()
-          index$platformname <- rv$inputData$stnall %>% lazy_dt() %>% select(platformname) %>% distinct() %>% pull() %>% sort()
-          index$serialnumber <- rv$inputData$stnall %>% lazy_dt() %>% select(serialnumber) %>% distinct() %>% pull() %>% sort()
-          index$gear <- rv$inputData$stnall %>% lazy_dt() %>% select(gear) %>% distinct() %>% pull() %>% sort()
-          # Put in global
+          index$missiontypename <- rv$inputData$mission %>% select(missiontypename) %>% distinct() %>% pull() %>% sort()
+          index$cruise <- rv$inputData$mission %>% select(cruise) %>% distinct() %>% pull() %>% sort()
+          index$year <- rv$inputData$mission %>% select(startyear) %>% distinct() %>% pull() %>% sort()
+          index$nstations <- rv$inputData$stnall %>% select(missionid, startyear, serialnumber) %>% distinct() %>% count() %>% pull()
+          index$commonname <- rv$inputData$stnall %>% select(commonname) %>% distinct() %>% pull() %>% sort()
+          index$platformname <- rv$inputData$stnall %>% select(platformname) %>% distinct() %>% pull() %>% sort()
+          index$serialnumber <- rv$inputData$stnall %>% select(serialnumber) %>% distinct() %>% pull() %>% sort()
+          index$gear <- rv$inputData$stnall %>% select(gear) %>% distinct() %>% pull() %>% sort()
+          index$date <- rv$inputData$stnall %>% summarise(min = min(stationstartdate, na.rm = TRUE), max = max(stationstartdate, na.rm = TRUE)) %>% collect()
+          index$nmeasured <- rv$inputData$indall %>% select(length) %>% count() %>% pull()
+          index$downloadstart <- rv$inputData$meta %>% select(timestart) %>% pull()
+          index$downloadend <- rv$inputData$meta %>% select(timeend) %>% pull()
           index <<- index
         }
         
@@ -856,8 +861,16 @@ server <- shinyServer(function(input, output, session) {
         output$EstStationsBox <- renderValueBox({
           
           valueBox(
-            value = tags$p(index$nstations, style = "font-size: 80%;"),
+            value = tags$p(paste(round(index$nstations/1000, 1), "k"), style = "font-size: 80%;"),
             subtitle = "Stations"
+          )
+        })
+        
+        output$EstMeasuredBox <- renderValueBox({
+          
+          valueBox(
+            value = tags$p(paste(round(index$nmeasured/1e6, 1), "M"), style = "font-size: 80%;"),
+            subtitle = "Measured specimen"
           )
         })
         
@@ -872,6 +885,13 @@ server <- shinyServer(function(input, output, session) {
           valueBox(
             length(index$gear),
             "Gear types"
+          )
+        })
+        
+        output$EstVesselsBox <- renderValueBox({
+          valueBox(
+            length(index$platformname),
+            "Platforms"
           )
         })
         
@@ -896,6 +916,10 @@ server <- shinyServer(function(input, output, session) {
                            style = "font-size: 80%;"),
             subtitle = "Last year"
           )
+        })
+        
+        output$snapshotTime <- renderText({
+          paste0("Database snapshot from ", index$downloadstart, ". Updates to the database are visible with one day delay.")
         })
         
       }
@@ -924,14 +948,14 @@ server <- shinyServer(function(input, output, session) {
   #.................
   ## Test output ####
   
-  output$test <- renderText({
-    #   # #   #
-    #   # #   #   # length(input$file1[[1]])
-    # paste(input$file1, collapse = "; ")
-    paste(rv$fileext, collapse = "; ")
-    #   # #   #   paste(rv$filterChain, collapse = "; ")
-    #  paste(input$tabs, collapse = "; ")
-  })
+  # output$test <- renderText({
+  #   #   # #   #
+  #   #   # #   #   # length(input$file1[[1]])
+  #   # paste(input$file1, collapse = "; ")
+  #   paste(rv$fileext, collapse = "; ")
+  #   #   # #   #   paste(rv$filterChain, collapse = "; ")
+  #   #  paste(input$tabs, collapse = "; ")
+  # })
   # 
   
   ##................... 
@@ -1260,81 +1284,34 @@ server <- shinyServer(function(input, output, session) {
       
       ### Base individual data ####
       
-      tmpBase <- rv$indall[commonname == input$indSpecies, ] 
-      
-      if (input$indSpecies == "blåkveite") {
-        
-        tmpTab <- data.table::dcast(tmpBase, cruise + startyear + serialnumber + longitudestart + latitudestart ~ catchpartnumber, fun.aggregate = length, value.var = "length")
-        
-        if(all(c(1, 2) %in% names(tmpTab))) {
-          
-          tmpTab$EggaSystem <- tmpTab$`1` > 0 & tmpTab$`2` > 0
-          
-          tmpBase <- dplyr::left_join(tmpBase, tmpTab[, !names(tmpTab) %in% 1:10, with = FALSE], by = c("startyear", "serialnumber", "cruise", "longitudestart", "latitudestart"))  
-          
-          tmpBase$sex <- ifelse(!is.na(tmpBase$sex), tmpBase$sex, ifelse(is.na(tmpBase$sex) & tmpBase$EggaSystem & tmpBase$catchpartnumber == 1, 1, ifelse(is.na(tmpBase$sex) & tmpBase$EggaSystem & tmpBase$catchpartnumber == 2, 2, NA)))
-          
-          tmpBase <- as.data.table(tmpBase[, names(tmpBase) != "EggaSystem"])
-        }
-      }
+      indOverviewDat <- individualFigureData(rv$indall, indSpecies = input$indSpecies, lengthUnit = input$lengthUnit, weightUnit = input$weightUnit, useEggaSystem = FALSE)
       
       ### Length-weight plot ####
       
-      if (all(c("length", "individualweight") %in% names(tmpBase))) {
+      if (all(c("length", "individualweight") %in% names(indOverviewDat$tmpBase))) {
         
-        lwDat <- tmpBase[!is.na(length) & !is.na(individualweight),]
-        
-        if(nrow(lwDat) > 0) {
+        if(nrow(indOverviewDat$lwDat) > 0) {
           
           output$weightData <- reactive(TRUE)
           
-          tmp <- lwDat
-          if (input$lengthUnit == "mm") tmp$length <- tmp$length/10
-          if (input$lengthUnit == "m") tmp$length <- tmp$length*100
-          if (input$weightUnit == "kg") tmp$individualweight <- tmp$individualweight*1000
-          
-          lwMod <- lm(log(individualweight) ~ log(length), data = lwDat)
-          tmpMod <- lm(log(individualweight) ~ log(length), data = tmp)
-          
           output$lwPlot <- renderPlotly({
             
-            p <- ggplot() +
-              geom_point(data = lwDat, aes(x = length, y = individualweight, text = paste0(  "cruise: ", cruise, "\nserialnumber: ", serialnumber, "\ncatchpartnumber: ", catchpartnumber, "\nspecimenid: ", specimenid))) + 
-              theme_classic(base_size = 12) 
-            
-            if (input$lwPlotLogSwitch) {
-              p <- p + 
-                scale_x_log10(paste0("Length [log10(", input$lengthUnit, ")]")) +
-                scale_y_log10(paste0("Weight [log10(", input$weightUnit, ")]")) + 
-                geom_smooth(data = lwDat, aes(x = length, y = individualweight), method = "lm", se = TRUE) 
-              
-            } else {
-              p <- p + 
-                scale_x_continuous(paste0("Length (", input$lengthUnit, ")")) +
-                scale_y_continuous(paste0("Weight (", input$weightUnit, ")")) + 
-                stat_function(data = 
-                                data.frame(x = range(lwDat$length)), aes(x),
-                              fun = function(a, b, x) {a*x^b},
-                              args = list(a = exp(coef(lwMod)[1]), b = coef(lwMod)[2]),
-                              color = "blue", size = 1)
-            }
-            
-            ggplotly(p) 
+            plotly::ggplotly(lwPlot(data = indOverviewDat, lwPlotLogSwitch = input$lwPlotLogSwitch))
             
           })
           
-          output$lwPlotText <- renderText(paste0("Coefficients (calculated using cm and g): \n a = ", round(exp(coef(tmpMod)[1]), 3), "; b = ", round(coef(tmpMod)[2], 3), "\n Number of included specimens = ", nrow(lwDat), "\n Total number of measured = ", nrow(tmpBase), "\n Excluded (length or weight missing): \n Length = ", sum(is.na(tmpBase$length)), "; weight = ", sum(is.na(tmpBase$individualweight))))
+          output$lwPlotText <- renderText(paste0("Coefficients (calculated using cm and g): \n a = ", round(indOverviewDat$lwMod$a, 3), "; b = ", round(indOverviewDat$lwMod$b, 3), "\n Number of included specimens = ", nrow(indOverviewDat$lwDat), "\n Total number of measured = ", nrow(indOverviewDat$tmpBase), "\n Excluded (length or weight missing): \n Length = ", sum(is.na(indOverviewDat$tmpBase$length)), "; weight = ", sum(is.na(indOverviewDat$tmpBase$individualweight))))
           
         } 
       } 
       
       ### Age - length plot ####
       
-      if (all(c("length", "age") %in% names(tmpBase))) {
+      if (all(c("length", "age") %in% names(indOverviewDat$tmpBase))) {
         
-        laDat <- tmpBase[!is.na(tmpBase$age) & !is.na(tmpBase$length), ]
+        laDat <- indOverviewDat$tmpBase[!is.na(tmpBase$age) & !is.na(tmpBase$length), ]
         
-        if(nrow(laDat) > 0) {
+        if(FALSE) { #nrow(laDat) > 0
           
           output$ageData <- reactive(TRUE)
           
@@ -1436,7 +1413,7 @@ server <- shinyServer(function(input, output, session) {
           output$maturityData <- reactive(TRUE)
           
           l50Dat$sex <- factor(l50Dat$sex)
-          l50Dat$sex <- dplyr::recode_factor(l50Dat$sex, "1" = "Female", "2" = "Male", "3" = "Unidentified")
+          l50Dat$sex <- dplyr::recode_factor(l50Dat$sex, "1" = "Female", "2" = "Male", "3" = "Unidentified", "4" = "Unidentified")
           
           l50Dat$maturity <- ifelse(l50Dat$maturationstage < 2, 0, ifelse(l50Dat$maturationstage >= 2, 1, NA))
           
