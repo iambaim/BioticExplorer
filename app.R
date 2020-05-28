@@ -78,19 +78,27 @@ tagList(
   )
 )
 
-stationOverviewFigureList <- list("Species composition" = "speciesCompositionPlot", "Total catch weight" = "catchweightSumPlot",
-                                  "Mean catch weight" = "catchweightMeanPlot", "Catch weight range" = "catchweightRangePlot",
-                                  "Mean weight of specimen" = "catchIndMeanWeightPlot", "Mean number in catch" = "catchcountMeanPlot", 
-                                  "Range of number in catch" = "catchcountRangePlot", "Total catch by gear type" = "gearCatchPlot", 
-                                  "Station depth" = "stationDepthPlot", "Fishing depth of the six most dominant species" = "catchSpeciesWeightPlot"
+stationOverviewFigureList <- list("Species composition" = "speciesCompositionPlot",
+                                  "Total catch weight" = "catchweightSumPlot",
+                                  "Mean catch weight" = "catchweightMeanPlot",
+                                  "Catch weight range" = "catchweightRangePlot",
+                                  "Mean weight of specimen" = "catchIndMeanWeightPlot",
+                                  "Mean number in catch" = "catchcountMeanPlot", 
+                                  "Range of number in catch" = "catchcountRangePlot",
+                                  "Total catch by gear type" = "gearCatchPlot", 
+                                  "Station depth" = "stationDepthPlot", 
+                                  "Fishing depth of the six most dominant species" = "catchSpeciesWeightPlot"
 )
 
 
 stationMapList <- list("Total catch map" = "catchMap", "Catch composition map" = "catchCompMap")
 
-dbPath <- "/data/duckdb/newdb.monetdb" 
-dbIndexPath <- "/data/duckdb/dbIndex.rda"
+individualOverviewFigureList <- list("Length distribution of species" = "indLengthPlot", "Weight distribution of species" = "indWeightPlot")
 
+speciesFigureList <- list("Length-weight" = "lwPlot", "Growth" = "laPlot", "Maturity" = "l50Plot", "Sex ratio map" = "sexRatioMap", "Length distribution map" = "sizeDistributionMap", "Length/sex disrtibution" = "lengthDistributionPlot", "Length/stage distribution" = "stageDistributionPlot")
+
+dbPath <- "/data/duckdb/newdb.monetdb"
+dbIndexPath <- "/data/duckdb/dbIndex.rda"
 if(file.exists(dbPath)) {
   message("dbPath found. Enabling server version.")
   if(file.exists(dbIndexPath)) {
@@ -220,9 +228,6 @@ body <-
                          
                          p("Here you can open a local file from your computer. BioticExplorer accepts the standard NMD Biotic V3 xml files and R native rds files. The R files can be used to return to a previous data manipulation instance using this app. Use the 'R' download file type in the Download data tab to enable this feature."),
                          
-                         strong("Performance mode:"),
-                         checkboxInput("performanceMode", "For large (>200 Mb) files. Disables features that burden memory.", FALSE),
-                         
                          fileInput("file1",
                                    label = "Choose xml or rds input file",
                                    multiple = TRUE,
@@ -232,21 +237,7 @@ body <-
                          hr(),
                          
                          strong("Drop excess data:"),
-                         checkboxInput("removeEmpty", "Remove empty columns", TRUE),
-                         
-                         radioButtons("lengthUnit", "Fish length unit:",
-                                      c("Millimeter" = "mm",
-                                        "Centimeter" = "cm",
-                                        "Meter" = "m"),
-                                      selected = "m",
-                                      inline = TRUE),
-                         
-                         radioButtons("weightUnit", "Fish weight unit:",
-                                      c("Grams" = "g",
-                                        "Kilograms" = "kg"),
-                                      selected = "kg",
-                                      inline = TRUE)
-                         
+                         checkboxInput("removeEmpty", "Remove empty columns", TRUE)
                        ), 
                        
                        box(
@@ -308,15 +299,7 @@ body <-
                        ),
                        
                        box(title = "Station locations", status = "primary", width = NULL,
-                           conditionalPanel(
-                             condition = "input.performanceMode == false",
-                             leafletOutput(outputId = "stationMap")
-                           ),
-                           
-                           conditionalPanel(
-                             condition = "input.performanceMode == true",
-                             p("Performance mode. No map. Subset data and use 'Stations & catches' -> 'Map of catches' to examine station locations.", align = "center")
-                           )       
+                           leafletOutput(outputId = "stationMap")
                        )
                 )
                 
@@ -371,16 +354,16 @@ body <-
                                                    label = "Cruise number:",
                                                    choices = NULL, multiple = TRUE),
                                     
-                                    selectizeInput(inputId = "selGeogAreaDb", 
-                                                   label = "Geographic area:",
-                                                   choices = "Not implemented yet", multiple = TRUE),
+                                    selectizeInput(inputId = "selFDIRAreaDb", 
+                                                   label = "FDIR Statistical area:",
+                                                   choices = NULL, multiple = TRUE),
                                     
                                     selectizeInput(inputId = "selICESAreaDb", 
                                                    label = "ICES area:",
-                                                   choices = "Not implemented yet", multiple = TRUE),
+                                                   choices = NULL, multiple = TRUE),
                                     
                                     dateRangeInput(inputId = "selDateDb", label = "Date:",
-                                                   start = "1900-01-01", startview = "decade", weekstart = 1)
+                                                   startview = "decade", weekstart = 1)
                              ),
                              
                              column(6,
@@ -543,7 +526,19 @@ body <-
               fluidRow(
                 box(title = "Select species", width = 12, status = "info", 
                     solidHeader = TRUE, 
-                    selectInput("indSpecies", "Select species:", choices = NULL)
+                    selectInput("indSpecies", "Select species:", choices = NULL),
+                    radioButtons("lengthUnit", "Fish length unit:",
+                                 c("Millimeter" = "mm",
+                                   "Centimeter" = "cm",
+                                   "Meter" = "m"),
+                                 selected = "m",
+                                 inline = TRUE),
+                    
+                    radioButtons("weightUnit", "Fish weight unit:",
+                                 c("Grams" = "g",
+                                   "Kilograms" = "kg"),
+                                 selected = "kg",
+                                 inline = TRUE)
                 ),
                 
                 ### weightData
@@ -559,9 +554,9 @@ body <-
                       br(),
                       column(4,
                              checkboxInput("lwPlotLogSwitch", "Logarithmic axes", FALSE)),
-                      column(8,
-                             actionButton("lwPlotExcludeSwitch", "Exclude points"),
-                             actionButton("lwPlotResetSwitch", "Reset")),
+                      # column(8,
+                      #        actionButton("lwPlotExcludeSwitch", "Exclude points"),
+                      #        actionButton("lwPlotResetSwitch", "Reset")),
                       column(12,
                              verbatimTextOutput("lwPlotText"))
                     ),
@@ -579,21 +574,39 @@ body <-
                     
                     conditionalPanel(
                       condition = "output.ageData == true",
-                      plotlyOutput("laPlot"),
                       
+                      p("Here you can estimate a growth model for a species. The growth models are fitted using the fishmethods::growth function. Select the desired growth model from the drop-down menu. If you have enough data, you can separate these models by sex. If there are not enough data for small individuals, you can try to force the model to a certain 0-group length. The strength of the forcing is defined using the 'Force 0-group strength' slider, which produces a number of age-0 fish of given length relative to the total number of all age-determined fish in the dataset."),
+                      p("Please note that running this function with too little data or using non-sense 0-group lengths will make the app to crash."),
                       br(),
-                      column(4,
-                             checkboxInput("laPlotSexSwitch", "Separate by sex", FALSE)),
-                      column(8,
-                             actionButton("laPlotExcludeSwitch", "Exclude points"),
-                             actionButton("laPlotResetSwitch", "Reset")),
                       column(12,
-                             verbatimTextOutput("laPlotText"))
+                             splitLayout(
+                               
+                               selectInput("growthModelSwitch", "Growth model:", choices = list("von Bertalanffy" = "vout", "Gompertz" = "gout", "Logistic" = "lout"), selected = "vout"),
+                               checkboxInput("laPlotSexSwitch", "Separate by sex", FALSE),
+                               numericInput("forceZeroGroupLength", "Force 0-group length", value = NA, min = 0, step = 0.01),
+                               sliderInput("forceZeroGroupStrength", "Force 0-group strength (%)", min = 1, max = 100, value = 10),
+                               
+                               cellWidths = c("25%", "15%", "30%", "30%"), cellArgs = list(style = "padding: 6px")
+                               
+                             )
+                      ),
+                      br(),
+                      column(12,
+                             plotlyOutput("laPlot"),
+                      ),
+                      # column(12,
+                      # actionButton("laPlotExcludeSwitch", "Exclude points"),
+                      # actionButton("laPlotResetSwitch", "Reset"),
+                      # ),
+                      
+                      column(12,
+                             verbatimTextOutput("laPlotText")
+                      )
                     ),
                     
                     conditionalPanel(
                       condition = "output.ageData == false",
-                      h4("Age data not available for the species.", align = "center")
+                      h4("Not enough age data available for the species.", align = "center")
                     )
                     
                 ),
@@ -635,7 +648,7 @@ body <-
                 
                 ### lengthData
                 
-                box(title = "Size distribution", width = 12, status = "info", 
+                box(title = "Geographic length distribution", width = 12, status = "info", 
                     solidHeader = TRUE, height = 760,
                     
                     conditionalPanel(
@@ -646,6 +659,44 @@ body <-
                     conditionalPanel(
                       condition = "output.lengthData == false",
                       h4("Length data not available for the species.", align = "center")
+                    )
+                ),
+                
+                ### lengthDistributionData
+                
+                box(title = "Sex specific length distribution", width = 12, status = "info", 
+                    solidHeader = TRUE, 
+                    
+                    conditionalPanel(
+                      condition = "output.lengthDistributionData == true",
+                      plotOutput(outputId = "lengthDistributionPlot")
+                    ),
+                    
+                    conditionalPanel(
+                      condition = "output.lengthDistributionData == false",
+                      h4("Not enough sex specific length data available for the species.", align = "center")
+                    )
+                ),
+                
+                ### stageDistributionData
+                
+                box(title = "Stage specific length distribution", width = 12, status = "info", 
+                    solidHeader = TRUE, 
+                    
+                    conditionalPanel(
+                      condition = "output.stageDistributionData == true",
+                      column(12,
+                             radioButtons("stageSelectionSwitch", "Select stage", choices = list("Maturation stage" = "maturationstage", "Special stage" = "specialstage"),
+                                          selected = "maturationstage", inline = TRUE)
+                      ),
+                      column(12,
+                             plotOutput(outputId = "stageDistributionPlot")
+                      )
+                    ),
+                    
+                    conditionalPanel(
+                      condition = "output.stageDistributionData == false",
+                      h4("Not enough stage specific length data available for the species.", align = "center")
                     )
                 )
               )
@@ -662,82 +713,6 @@ body <-
       tabItem("individualExamine", DT::dataTableOutput("individualTable")),
       tabItem("agedeterminationExamine", DT::dataTableOutput("agedeterminationTable")),
       
-      ##........................
-      ## Export figures tab ####
-      
-      tabItem("exportFigures",
-              box(title = "1. Select the figures to export", width = 12, status = "info", 
-                  solidHeader = TRUE,
-                  
-                  checkboxGroupInput("cruiseMapExport", label = h4("Station map and cruise track (use only when the xml file consist of entire cruise)"), 
-                                     choices = list("Cruise map" = 1),
-                                     selected = NULL, inline = TRUE),
-                  
-                  radioButtons("plotCruiseTrack", "Cruise track:", 
-                               choices = list("Do not plot" = "No", "From station sequence" = "Stations", "From file" = "File"),
-                               selected = "No",
-                               inline = TRUE
-                  ),
-                  
-                  conditionalPanel(condition = "input.plotCruiseTrack == 'File'",
-                                   fileInput("cruiseTrackFile",
-                                             label = "Upload cruise track",
-                                             multiple = TRUE,
-                                             accept = NA)
-                  ),
-                  
-                  checkboxGroupInput("stationOverviewExport", label = h4("Station overview figures"), 
-                                     choices = stationOverviewFigureList,
-                                     selected = NA, inline = TRUE),
-                  
-                  actionLink("selectAllStationOverviewExport", "Select/deselect all"),
-                  
-                  h4("Station based maps"),
-                  
-                  splitLayout(cellWidths = c("25%", "40%"),
-                              checkboxGroupInput("stationCatchMapExport", label = NULL, choices = stationMapList[1]),
-                              selectInput("catchMapExportSpecies", NULL, choices = NULL)
-                  ),
-                  
-                  checkboxGroupInput("stationMapExport", label = NULL, 
-                                     choices = stationMapList[-1],
-                                     selected = NA, inline = TRUE),
-                  
-                  
-                  actionLink("selectAllStationMapExport", "Select/deselect all")
-                  
-              ),
-              
-              box(title = "2. Download selected figures", width = 12, status = "info", 
-                  solidHeader = TRUE,
-                  
-                  numericInput("figureWidth", "Figure width in cm (the height will be scaled automatically)", value = 18), 
-                  
-                  radioButtons("downloadFiguresAs", "Download as:", 
-                               choices = list("Figure files" = "File", "Cruise report template" = "Report"),
-                               selected = "File",
-                               inline = TRUE
-                  ),
-                  
-                  
-                  conditionalPanel(condition = "input.downloadFiguresAs == 'File'",
-                                   radioButtons("downloadFigureFormat", "File format:",
-                                                choices = list("Png" = ".png", "Jpeg" = ".jpeg", "Pdf" = ".pdf"),
-                                                selected = ".png",
-                                                inline = TRUE)
-                  ),
-                  
-                  conditionalPanel(condition = "input.downloadFiguresAs == 'Report'",
-                                   radioButtons("downloadReportFormat", "File format:",
-                                                choices = list("Rmarkdown" = "Rmd", "Word" = "Doc", "Pdf" = "Pdf"),
-                                                selected = "Rmd",
-                                                inline = TRUE)
-                  ),
-                  
-                  downloadButton(outputId = "downloadFigures")
-              )
-      ),
-      
       ##...................
       ## Download tab ####
       
@@ -745,25 +720,129 @@ body <-
               fluidRow(
                 box(
                   title = "Download data", width = 12, status = "primary", solidHeader = TRUE,
-                  radioButtons("downloadFileType", "Download file type:",
-                               c("R" = ".rda",
-                                 "csv" = ".csv",
-                                 "Excel" = ".xlsx"),
-                               selected = ".rda"
-                  ),
                   
-                  checkboxGroupInput("downloadDataType", "Data to download:",
-                                     c("Cruise overview" = "mission",
-                                       "Stations & catches" = "stnall",
-                                       "Individuals & ages" = "indall"
-                                       #"Original format" = "original"
-                                     ),
-                                     selected = c("mission", "stnall", "indall")
+                  p("You can download data from your Biotic Explrer session here. If you want to reopen the data in Biotic Explorer or open the data in R, use the 'R' option without changing 'Data to download' options. This will save the data as an .rds file, which can be opened using the", a("'readRDS'", href = "https://stat.ethz.ch/R-manual/R-devel/library/base/html/readRDS.html"), "function in R and reopened using Biotic Explorer. Data can also be downloaded as .zip compressed .csv files or as an Excel file. The data are automatically placed to tabs in Excel files."),
+                  
+                  br(),
+                  
+                  splitLayout(
+                    
+                    radioButtons("downloadFileType", "Download file type:",
+                                 c("R" = ".rda",
+                                   "csv" = ".csv",
+                                   "Excel" = ".xlsx"),
+                                 selected = ".rda"
+                    ),
+                    
+                    checkboxGroupInput("downloadDataType", "Data to download:",
+                                       c("Cruise overview" = "mission",
+                                         "Stations & catches" = "stnall",
+                                         "Individuals & ages" = "indall"
+                                         #"Original format" = "original"
+                                       ),
+                                       selected = c("mission", "stnall", "indall")
+                    ), 
+                    cellArgs = list(style = "padding: 6px")
                   ),
                   
                   downloadButton(outputId = "downloadData")
                   # verbatimTextOutput("test")
                 ) 
+              )
+      ),
+      
+      ##........................
+      ## Export figures tab ####
+      
+      tabItem("exportFigures",
+              fluidRow(
+                box(title = "1. Select the figures to export", width = 12, status = "info", 
+                    solidHeader = TRUE,
+                    
+                    p("This tab is still under development and does not work as intended yet."),
+                    
+                    checkboxGroupInput("cruiseMapExport", label = h4("Station map"), 
+                                       choices = list("Station map" = 1),
+                                       selected = NULL, inline = TRUE),
+                    
+                    conditionalPanel(condition = "output.weightData == true", 
+                                     radioButtons("plotCruiseTrack", "Cruise track:", 
+                                                  choices = list("Do not plot" = "No", "From station sequence" = "Stations", "From file" = "File"),
+                                                  selected = "No",
+                                                  inline = TRUE
+                                     )
+                    ),
+                    
+                    conditionalPanel(condition = "input.plotCruiseTrack == 'File'",
+                                     fileInput("cruiseTrackFile",
+                                               label = "Upload cruise track",
+                                               multiple = TRUE,
+                                               accept = NA)
+                    ),
+                    
+                    checkboxGroupInput("stationOverviewExport", 
+                                       label = h4("Station overview figures"), 
+                                       choices = stationOverviewFigureList,
+                                       selected = NA, inline = FALSE),
+                    
+                    actionLink("selectAllStationOverviewExport", "Select/deselect all"),
+                    
+                    h4("Station based maps"),
+                    
+                    splitLayout(cellWidths = c("25%", "40%"),
+                                checkboxGroupInput("stationCatchMapExport", label = NULL, choices = stationMapList[1]),
+                                selectInput("catchMapExportSpecies", NULL, choices = NULL)
+                    ),
+                    
+                    checkboxGroupInput("stationMapExport", label = NULL, 
+                                       choices = stationMapList[-1],
+                                       selected = NA, inline = TRUE),
+                    
+                    
+                    actionLink("selectAllStationMapExport", "Select/deselect all"),
+                    
+                    checkboxGroupInput("individualOverviewExport", 
+                                       label = h4("Individuals overview"), 
+                                       choices = individualOverviewFigureList,
+                                       selected = NA, inline = TRUE),
+                    
+                    h4("Species plots"),
+                    
+                    checkboxGroupInput("speciesFigureExport", 
+                                       label = NULL, 
+                                       choices = speciesFigureList,
+                                       selected = NA, inline = TRUE)
+                    
+                ),
+                
+                box(title = "2. Download selected figures", width = 12, status = "info", 
+                    solidHeader = TRUE,
+                    
+                    numericInput("figureWidth", "Figure width in cm (the height will be scaled automatically)", value = 18), 
+                    
+                    radioButtons("downloadFiguresAs", "Download as:", 
+                                 choices = list("Figure files" = "File", "Cruise report template (not implemented)" = "Report"),
+                                 selected = "File",
+                                 inline = TRUE
+                    ),
+                    
+                    
+                    conditionalPanel(condition = "input.downloadFiguresAs == 'File'",
+                                     radioButtons("downloadFigureFormat", "File format:",
+                                                  choices = list("Png" = ".png", "Jpeg" = ".jpeg", "Pdf" = ".pdf"),
+                                                  selected = ".png",
+                                                  inline = TRUE)
+                    ),
+                    
+                    conditionalPanel(condition = "input.downloadFiguresAs == 'Report'",
+                                     radioButtons("downloadReportFormat", "File format:",
+                                                  choices = list("Rmarkdown" = "Rmd", "Word" = "Doc", "Pdf" = "Pdf"),
+                                                  selected = "Rmd",
+                                                  inline = TRUE)
+                    ),
+                    
+                    downloadButton(outputId = "downloadFigures")
+                )
               )
       )
     )
@@ -785,6 +864,9 @@ server <- shinyServer(function(input, output, session) {
   
   output$serverVersion <- reactive(file.exists(dbPath)) 
   outputOptions(output, "serverVersion", suspendWhenHidden = FALSE)
+  
+  output$singleCruise <- reactive(FALSE) 
+  outputOptions(output, "singleCruise", suspendWhenHidden = FALSE)
   
   source("R/filtering_functions.R", local = TRUE) ## Source functions for the session. See https://shiny.rstudio.com/articles/scoping.html
   
@@ -1273,12 +1355,16 @@ server <- shinyServer(function(input, output, session) {
     output$maturityData <- reactive(FALSE)
     output$sexData <- reactive(FALSE)
     output$lengthData <- reactive(FALSE)
+    output$lengthDistributionData <- reactive(FALSE)
+    output$stageDistributionData <- reactive(FALSE)
     
     outputOptions(output, "ageData", suspendWhenHidden = FALSE)
     outputOptions(output, "weightData", suspendWhenHidden = FALSE)
     outputOptions(output, "maturityData", suspendWhenHidden = FALSE)
     outputOptions(output, "sexData", suspendWhenHidden = FALSE)
     outputOptions(output, "lengthData", suspendWhenHidden = FALSE)
+    outputOptions(output, "lengthDistributionData", suspendWhenHidden = FALSE)
+    outputOptions(output, "stageDistributionData", suspendWhenHidden = FALSE)
     
     if (input$tabs == "indallSpecies" & input$indSpecies != "" & !input$indSpecies %in% c("Select a species to generate the plots", "No species with sufficient data")) {
       
@@ -1288,285 +1374,78 @@ server <- shinyServer(function(input, output, session) {
       
       ### Length-weight plot ####
       
-      if (all(c("length", "individualweight") %in% names(indOverviewDat$tmpBase))) {
+      if (!is.null(indOverviewDat$lwDat)) {
         
-        if(nrow(indOverviewDat$lwDat) > 0) {
+        output$weightData <- reactive(TRUE)
+        
+        output$lwPlot <- renderPlotly({
           
-          output$weightData <- reactive(TRUE)
+          plotly::ggplotly(lwPlot(data = indOverviewDat, lwPlotLogSwitch = input$lwPlotLogSwitch))
           
-          output$lwPlot <- renderPlotly({
-            
-            plotly::ggplotly(lwPlot(data = indOverviewDat, lwPlotLogSwitch = input$lwPlotLogSwitch))
-            
-          })
-          
-          output$lwPlotText <- renderText(paste0("Coefficients (calculated using cm and g): \n a = ", round(indOverviewDat$lwMod$a, 3), "; b = ", round(indOverviewDat$lwMod$b, 3), "\n Number of included specimens = ", nrow(indOverviewDat$lwDat), "\n Total number of measured = ", nrow(indOverviewDat$tmpBase), "\n Excluded (length or weight missing): \n Length = ", sum(is.na(indOverviewDat$tmpBase$length)), "; weight = ", sum(is.na(indOverviewDat$tmpBase$individualweight))))
-          
-        } 
+        })
+        
+        output$lwPlotText <- renderText(paste0("Coefficients (calculated using cm and g): \n a = ", round(indOverviewDat$lwMod$a, 3), "; b = ", round(indOverviewDat$lwMod$b, 3), "\n Number of included specimens = ", nrow(indOverviewDat$lwDat), "\n Total number of measured = ", nrow(indOverviewDat$tmpBase), "\n Excluded (length or weight missing): \n Length = ", sum(is.na(indOverviewDat$tmpBase$length)), "; weight = ", sum(is.na(indOverviewDat$tmpBase$individualweight))))
+        
       } 
       
       ### Age - length plot ####
       
-      if (all(c("length", "age") %in% names(indOverviewDat$tmpBase))) {
+      if (!is.null(indOverviewDat$laDat)) {
         
-        laDat <- indOverviewDat$tmpBase[!is.na(tmpBase$age) & !is.na(tmpBase$length), ]
+        output$ageData <- reactive(TRUE)
         
-        if(FALSE) { #nrow(laDat) > 0
-          
-          output$ageData <- reactive(TRUE)
-          
-          if (input$laPlotSexSwitch) {
-            
-            laDat <- laDat %>% filter(!is.na(sex))
-            
-            laModF <- fishmethods::growth(age = laDat[laDat$sex == 1,]$age, size = laDat[laDat$sex == 1,]$length, Sinf = max(laDat[laDat$sex == 1,]$length), K = 0.1, t0 = 0, graph = FALSE)
-            
-            laModM <- fishmethods::growth(age = laDat[laDat$sex == 2,]$age, size = laDat[laDat$sex == 2,]$length, Sinf = max(laDat[laDat$sex == 2,]$length), K = 0.1, t0 = 0, graph = FALSE)
-            
-            laDat$sex <- as.factor(laDat$sex)
-            laDat$sex <- dplyr::recode_factor(laDat$sex, "1" = "Female", "2" = "Male")
-            
-            output$laPlot <- renderPlotly({
-              
-              p <- ggplot() +
-                geom_point(data = laDat, aes(x = age, y = length, color = as.factor(sex), text = paste0("cruise: ", cruise, "\nserialnumber: ", serialnumber, "\ncatchpartnumber: ", catchpartnumber, "\nspecimenid: ", specimenid))) +
-                expand_limits(x = 0) +
-                scale_color_manual("Sex", values = c(ColorPalette[4], ColorPalette[1])) + 
-                geom_hline(yintercept = coef(laModF$vout)[1], linetype = 2, color = ColorPalette[4], alpha = 0.5) +
-                geom_hline(yintercept = coef(laModM$vout)[1], linetype = 2, color = ColorPalette[1], alpha = 0.5) +
-                ylab(paste0("Total length (", input$lengthUnit, ")")) +
-                xlab("Age (years)") +
-                theme_classic(base_size = 14) + 
-                stat_function(data = data.frame(x = range(laDat$age)), aes(x),
-                              fun = function(Sinf, K, t0, x) {Sinf*(1 - exp(-K*(x - t0)))},
-                              args = list(Sinf = coef(laModM$vout)[1], 
-                                          K = coef(laModM$vout)[2], 
-                                          t0 = coef(laModM$vout)[3]),
-                              color = ColorPalette[1], size = 1) +
-                stat_function(data = data.frame(x = range(laDat$age)), aes(x),
-                              fun = function(Sinf, K, t0, x) {Sinf*(1 - exp(-K*(x - t0)))},
-                              args = list(Sinf = coef(laModF$vout)[1], 
-                                          K = coef(laModF$vout)[2], 
-                                          t0 = coef(laModF$vout)[3]),
-                              color = ColorPalette[4], size = 1)
-              
-              ggplotly(p) 
-            })
-            
-            output$laPlotText <- renderText(
-              paste0("von Bertalanffy growth function coefficients\n for females and males, respectively: \n Linf (asymptotic average length) = ", round(coef(laModF$vout)[1], 3), " and ", round(coef(laModM$vout)[1], 3), " ", input$lengthUnit, 
-                     "\n K (growth rate coefficient) = ", round(coef(laModF$vout)[2], 3), " and ", round(coef(laModM$vout)[2], 3), 
-                     "\n t0 (length at age 0) = ", round(coef(laModF$vout)[3], 3), " and ", round(coef(laModM$vout)[3], 3), " ", input$lengthUnit, 
-                     "\n tmax (life span; t0 + 3/K) = ", round(coef(laModF$vout)[3] + 3 / coef(laModF$vout)[2], 1), " and ", round(coef(laModM$vout)[3] + 3 / coef(laModM$vout)[2], 1), " years",
-                     "\n Number of included specimens = ", nrow(laDat), 
-                     "\n Total number of measured = ", nrow(tmpBase), 
-                     "\n Excluded (length, age or sex missing): \n Length = ", sum(is.na(tmpBase$length)), "; age = ", sum(is.na(tmpBase$age)), "; sex = ", sum(is.na(tmpBase$sex))))
-            
-          } else {
-            
-            laMod <- fishmethods::growth(age = laDat$age, size = laDat$length, Sinf = max(laDat$length), K = 0.1, t0 = 0, graph = FALSE)
-            
-            
-            output$laPlot <- renderPlotly({
-              
-              p <- ggplot() +
-                geom_point(data = laDat, aes(x = age, y = length)) +
-                expand_limits(x = 0) +
-                geom_hline(yintercept = coef(laMod$vout)[1], linetype = 2, color = "grey") +
-                ylab(paste0("Total length (", input$lengthUnit, ")")) +
-                xlab("Age (years)") +
-                theme_classic(base_size = 14) + 
-                stat_function(data = 
-                                data.frame(x = range(laDat$age)), aes(x),
-                              fun = function(Sinf, K, t0, x) {Sinf*(1 - exp(-K*(x - t0)))},
-                              args = list(Sinf = coef(laMod$vout)[1], 
-                                          K = coef(laMod$vout)[2], 
-                                          t0 = coef(laMod$vout)[3]),
-                              color = "blue", size = 1)
-              
-              ggplotly(p) 
-            })
-            
-            output$laPlotText <- renderText(paste0(
-              "von Bertalanffy growth function coefficients: \n Linf (asymptotic average length) = ", round(coef(laMod$vout)[1], 3), " ", input$lengthUnit, 
-              "\n K (growth rate coefficient) = ", round(coef(laMod$vout)[2], 3), 
-              "\n t0 (length at age 0) = ", round(coef(laMod$vout)[3], 3), " ", input$lengthUnit, 
-              "\n tmax (life span; t0 + 3/K) = ", round(coef(laMod$vout)[3] + 3 / coef(laMod$vout)[2], 1), " years", 
-              "\n Number of included specimens = ", nrow(laDat), 
-              "\n Total number of measured = ", nrow(tmpBase), 
-              "\n Excluded (length or age missing): \n Length = ", sum(is.na(tmpBase$length)), "; age = ", sum(is.na(tmpBase$age)))
-            )
-          }  
-        } 
+        LAPlot <- laPlot(data = indOverviewDat, laPlotSexSwitch = input$laPlotSexSwitch, 
+                         growthModelSwitch = input$growthModelSwitch, forceZeroGroupLength = input$forceZeroGroupLength, 
+                         forceZeroGroupStrength = input$forceZeroGroupStrength
+        )
+        
+        output$laPlot <- renderPlotly(ggplotly(LAPlot$laPlot))
+        output$laPlotText <- renderText(LAPlot$laText)
+        
       }
       
       ### L50 maturity plot  ####
       
-      if (all(c("sex", "maturationstage") %in% names(tmpBase))) {
+      if (!is.null(indOverviewDat$l50Dat)) {  
         
-        l50Dat <- tmpBase[!is.na(tmpBase$sex) & !is.na(tmpBase$maturationstage), ]
+        output$maturityData <- reactive(TRUE)
         
-        # l50Dat <- tmpBase %>% dplyr::filter(!is.na(sex) & !is.na(maturationstage))
+        L50Plot <- l50Plot(data = indOverviewDat)
         
-        if(nrow(l50Dat) > 10) {
-          
-          output$maturityData <- reactive(TRUE)
-          
-          l50Dat$sex <- factor(l50Dat$sex)
-          l50Dat$sex <- dplyr::recode_factor(l50Dat$sex, "1" = "Female", "2" = "Male", "3" = "Unidentified", "4" = "Unidentified")
-          
-          l50Dat$maturity <- ifelse(l50Dat$maturationstage < 2, 0, ifelse(l50Dat$maturationstage >= 2, 1, NA))
-          
-          modF <- glm(maturity ~ length, data = l50Dat[l50Dat$sex == "Female",], family = binomial(link = "logit"))
-          modM <- glm(maturity ~ length, data = l50Dat[l50Dat$sex == "Male",], family = binomial(link = "logit"))
-          
-          Fdat <- unlogit(0.5, modF)
-          Fdat$sex <- "Female"
-          Mdat <- unlogit(0.5, modM)
-          Mdat$sex <- "Male"
-          modDat <- rbind(Fdat, Mdat)
-          
-          output$l50Plot <- renderPlot({
-            
-            ggplot(l50Dat, aes(x = length, y = maturity, shape = sex)) + 
-              geom_point() + 
-              geom_segment(data = modDat, 
-                           aes(x = mean, xend = mean, y = 0, yend = 0.5, color = sex),
-                           linetype = 2) +
-              geom_segment(data = modDat, 
-                           aes(x = -Inf, xend = mean, y = 0.5, yend = 0.5, color = sex),
-                           linetype = 2) +
-              geom_text(data = modDat, 
-                        aes(x = mean, y = -0.03, label = paste(round(mean, 2), input$lengthUnit),
-                            color = sex), size = 3) +
-              stat_smooth(aes(color = sex), method="glm", 
-                          method.args=list(family="binomial")) +
-              ylab(paste0("Total length (", input$lengthUnit, ")")) +
-              ylab("Maturity") + 
-              scale_color_manual("Sex", values = c(ColorPalette[4], ColorPalette[1])) +
-              scale_shape("Sex", solid = FALSE) + 
-              theme_bw(base_size = 14) + 
-              guides(color=guide_legend(override.aes=list(fill=NA))) + 
-              theme(legend.position = c(0.9, 0.25), 
-                    legend.background = element_blank(), legend.key = element_blank())
-            
-          })
-          
-          output$l50PlotText <- renderText({
-            paste0("50% maturity at length (L50) based on logit regressions and assuming maturitystage >= 2 as mature:",
-                   "\n\n Females: ", round(modDat[modDat$sex == "Female", "mean"], 3), " ", input$lengthUnit, ". 95% confidence intervals: ", round(modDat[modDat$sex == "Female", "ci.min"], 3), " - ", round(modDat[modDat$sex == "Female", "ci.max"], 3),
-                   "\n  Number of specimens: ", nrow(l50Dat[l50Dat$sex == "Female",]),
-                   "\n\n Males: ", round(modDat[modDat$sex == "Male", "mean"], 3), " ", input$lengthUnit, ". 95% confidence intervals: ", round(modDat[modDat$sex == "Male", "ci.min"], 3), " - ", round(modDat[modDat$sex == "Male", "ci.max"], 3),
-                   "\n  Number of specimens: ", nrow(l50Dat[l50Dat$sex == "Male",]))
-          })
-        } 
+        output$l50Plot <- renderPlot(L50Plot$Plot)
+        output$l50PlotText <- renderText(L50Plot$Text)
         
       } 
       
       ## Sex ratio map ####
       
-      if (c("sex") %in% names(tmpBase)) {
-        
-        srDat <- tmpBase %>% 
-          dplyr::filter(!is.na(sex)) %>% 
-          dplyr::group_by(cruise, startyear, serialnumber, longitudestart, latitudestart) %>% 
-          dplyr::summarise(Female = sum(sex == 1), Male = sum(sex == 2), total = length(sex))
-        
-        if (nrow(srDat) > 0) {
-          
-          output$sexData <- reactive(TRUE)
-          
-          output$sexRatioMap <- renderLeaflet({
-            
-            leaflet::leaflet() %>% 
-              addTiles(urlTemplate = "https://server.arcgisonline.com/ArcGIS/rest/services/Ocean_Basemap/MapServer/tile/{z}/{y}/{x}",
-                       attribution = "Tiles &copy; Esri &mdash; Sources: GEBCO, NOAA, CHS, OSU, UNH, CSUMB, National Geographic, DeLorme, NAVTEQ, and Esri") %>% 
-              addMinicharts(
-                srDat$longitudestart, srDat$latitudestart,
-                type = "pie", chartdata = srDat[,c("Female", "Male")],
-                colorPalette = c(ColorPalette[4], ColorPalette[1]),
-                width = 40 * log10(srDat$total) / log10(max(srDat$total)), 
-                transitionTime = 0
-              )
-            
-          })
-          
-        } 
+      if (!is.null(indOverviewDat$srDat)) {
+        output$sexData <- reactive(TRUE)
+        output$sexRatioMap <- renderLeaflet(sexRatioMap(data = indOverviewDat))
       } 
       
       ## Size distribution map ####
       
-      if (all(c("cruise", "startyear", "serialnumber", "longitudestart", "latitudestart", "length") %in% names(tmpBase))) {
-        
-        sdDat <- tmpBase %>% 
-          dplyr::filter(!is.na(length)) %>% 
-          dplyr::select(cruise, startyear, serialnumber, longitudestart, latitudestart, length) %>% 
-          dplyr::mutate(interval = ggplot2::cut_interval(length, n = 5)) %>% 
-          dplyr::group_by(cruise, startyear, serialnumber, longitudestart, latitudestart, interval, .drop = FALSE) %>% 
-          dplyr::summarise(count = n())
-        
-        if(nrow(sdDat) > 0) {
-          
-          output$lengthData <- reactive(TRUE)
-          
-          sdDatW <- spread(sdDat, interval, count)
-          
-          sdDatW$total <- rowSums(sdDatW[,levels(sdDat$interval)])
-          
-          output$sizeDistributionMap <- renderLeaflet({
-            
-            leaflet::leaflet() %>% 
-              addTiles(urlTemplate = "https://server.arcgisonline.com/ArcGIS/rest/services/Ocean_Basemap/MapServer/tile/{z}/{y}/{x}",
-                       attribution = "Tiles &copy; Esri &mdash; Sources: GEBCO, NOAA, CHS, OSU, UNH, CSUMB, National Geographic, DeLorme, NAVTEQ, and Esri") %>% 
-              addMinicharts(
-                sdDatW$longitudestart, sdDatW$latitudestart,
-                type = "pie", chartdata = sdDatW[,levels(sdDat$interval)],
-                colorPalette = viridis::viridis(5),
-                width = 40 * log10(sdDatW$total) / log10(max(sdDatW$total)), 
-                transitionTime = 0
-              )
-            
-          })
-          
-        }
-        
+      if (!is.null(indOverviewDat$sdDat)) { 
+        output$lengthData <- reactive(TRUE)
+        output$sizeDistributionMap <- renderLeaflet(sizeDistributionMap(data = indOverviewDat))
       }
       
-      # 
-      # tmp3 <- tmpBase %>% filter(!is.na(length)) %>% replace_na(list(sex = 3)) %>% mutate(sex = factor(sex)) 
-      # tmp3$sex <- recode_factor(tmp3$sex, "1" = "Female", "2" = "Male", "3" = "Unidentified")
-      # 
-      # ggplot(tmp3, aes(x = length, color = sex)) +
-      #   geom_density(adjust = 0.5) +
-      #   xlab(paste0("Total length (", input$lengthUnit, ")")) +
-      #   ylab("Count density") +
-      #   #facet_wrap(~sex, ncol = 3, scales = "free_y") +
-      #   scale_color_discrete("Sex") +
-      #   theme_classic(base_size = 14)
-      # 
-      # tmp4 <- tmp3 %>% filter(sex != "Unidentified" & !is.na(maturationstage))
-      # 
-      # ggplot(tmp4, aes(x = length, stat(count),color = as.factor(maturationstage))) +
-      #   geom_density(adjust = 0.5) +
-      #   xlab(paste0("Total length (", input$lengthUnit, ")")) +
-      #   ylab("Count density") +
-      #   facet_wrap(~sex, ncol = 2, scales = "free_y") +
-      #   scale_color_discrete("Maturation stage") +
-      #   theme_classic(base_size = 14)
-      # 
-      # ggplot(tmp4, aes(x = length, stat(count), color = as.factor(specialstage))) +
-      #   geom_density(adjust = 0.5) +
-      #   xlab(paste0("Total length (", input$lengthUnit, ")")) +
-      #   ylab("Count density") +
-      #   facet_wrap(~sex, ncol = 2, scales = "free_y") +
-      #   scale_color_discrete("Special stage") +
-      #   theme_classic(base_size = 14)
-      # 
-      # Add stage & special stage
+      ## Length distribution plot ####
       
-      # Add depth preference
+      if (!is.null(indOverviewDat$ldDat)) { 
+        output$lengthDistributionData <- reactive(TRUE)
+        output$lengthDistributionPlot <- renderPlot(lengthDistributionPlot(data = indOverviewDat))
+      }
       
+      ## Stage distribution plot ####
       
+      if (!is.null(indOverviewDat$ldDat)) { 
+        if(nrow(na.omit(indOverviewDat$ldDat[input$stageSelectionSwitch])) > 10) {
+          output$stageDistributionData <- reactive(TRUE)
+          output$stageDistributionPlot <- renderPlot(stageDistributionPlot(data = indOverviewDat, selectedStage = input$stageSelectionSwitch))
+        }
+      }
     } 
     
   }) 
