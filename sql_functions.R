@@ -89,7 +89,7 @@ DTfromSQL <- function(session, con, tableName, id) {
 processBioticDB <- function(con_db, lengthUnit = "cm", weightUnit = "g", removeEmpty = TRUE, coreDataOnly = FALSE, returnOriginal = TRUE, dataTable = TRUE, convertColumns = TRUE, missionidPrefix = NULL) {
   
   ## Check
-  if(!class(con_db)[1] == "MonetDBEmbeddedConnection") stop("Connection is unavailable")
+  #if(!class(con_db)[1] == "MonetDBEmbeddedConnection") stop("Connection is unavailable")
   
   ## create connection
   msn <- tbl(con_db, "mission")

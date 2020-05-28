@@ -732,20 +732,21 @@ updateMap <- function() {
 
       output$stationMap <- renderLeaflet({
         
-        leaflet::leaflet(rv$stnall %>% select(missiontype, startyear, platform, platformname, missionnumber, missionid, serialnumber, latitudestart, longitudestart) %>% 
-                          filter(!is.na(longitudestart) & !is.na(latitudestart)) %>% distinct() %>% collect()) %>% 
-          addTiles(urlTemplate = "https://server.arcgisonline.com/ArcGIS/rest/services/Ocean_Basemap/MapServer/tile/{z}/{y}/{x}",
-                   attribution = "Tiles &copy; Esri &mdash; Sources: GEBCO, NOAA, CHS, OSU, UNH, CSUMB, National Geographic, DeLorme, NAVTEQ, and Esri") %>% 
-          addRectangles(
-            lng1 = rv$sub$lon[1], lat1 = rv$sub$lat[1], lng2 = rv$sub$lon[2], lat2 = rv$sub$lat[2],
-            fillColor = "transparent") %>% 
-          addCircleMarkers(lat = ~ latitudestart, lng = ~ longitudestart, 
-                     weight = 1, radius = 2, 
-                     popup = ~as.character(platformname), 
-                     label = ~as.character(serialnumber), 
-                     color = "red", fillOpacity = 0.5,
-                     clusterOptions = markerClusterOptions()
-          )
+        leaflet::leaflet(options = leafletOptions(preferCanvas = TRUE),
+                        rv$stnall %>% select(missiontype, startyear, platform, platformname, missionnumber, missionid, serialnumber, latitudestart, longitudestart) %>% 
+                        filter(!is.na(longitudestart) & !is.na(latitudestart)) %>% distinct() %>% collect()) %>% 
+                        addTiles(urlTemplate = "https://server.arcgisonline.com/ArcGIS/rest/services/Ocean_Basemap/MapServer/tile/{z}/{y}/{x}",
+                        attribution = "Tiles &copy; Esri &mdash; Sources: GEBCO, NOAA, CHS, OSU, UNH, CSUMB, National Geographic, DeLorme, NAVTEQ, and Esri") %>% 
+                        addRectangles(
+                               lng1 = rv$sub$lon[1], lat1 = rv$sub$lat[1], lng2 = rv$sub$lon[2], lat2 = rv$sub$lat[2],
+                               fillColor = "transparent") %>% 
+                        addCircleMarkers(lat = ~ latitudestart, lng = ~ longitudestart, 
+                               radius = 3,
+                               popup = ~as.character(platformname), 
+                               label = ~as.character(serialnumber), 
+                               stroke = FALSE, color = "red", fillOpacity = 0.5,
+                               clusterOptions = markerClusterOptions(disableClusteringAtZoom = 10, maxClusterRadius = 50)
+                        )
       })
     } else {
       output$stationMap <- NULL
@@ -872,40 +873,48 @@ obsPopulatePanel <- function() {
   
   
   ##................
-  ## Subsetting ####
-  
+  ## Subsetting #### 
   observeEvent(input$Subset, {
     # Make a chain of filters
     filterChain <- list()
 
+    # Collapse filter function
+    cf <- function(x) {
+	if(is.numeric(x))
+		y <- paste0('c(', paste(x, collapse=','), ')')
+	else
+		y <- paste0('c("', paste(x, collapse='","'), '")')
+	return(y)
+    }
+
     rv$sub$year <- input$subYear
     if (!is.null(input$subYear)) { 
-      filterChain <- append(filterChain, paste0("startyear %in% '", input$subYear, "'"))
+      filterChain <- append(filterChain, paste0("startyear %in% ", cf(input$subYear)))
     }
 
     rv$sub$species <- input$subSpecies    
     if (!is.null(input$subSpecies)) {
-      filterChain <- append(filterChain, paste0("commonname %in% '", input$subSpecies, "'"))
+      filterChain <- append(filterChain, paste0("commonname %in% ", cf(input$subSpecies)))
     }
 
     rv$sub$cruise <- input$subCruise
     if (!is.null(input$subCruise)) {
-      filterChain <- append(filterChain, paste0("cruise %in% '", input$subCruise, "'"))
+      filterChain <- append(filterChain, paste0("cruise %in% ", cf(input$subCruise)))
     }
 
     rv$sub$platform <- input$subPlatform    
     if (!is.null(input$subPlatform)) {
-      filterChain <- append(filterChain, paste0("platformname %in% '", input$subPlatform, "'"))
+      filterChain <- append(filterChain, paste0("platformname %in% ", cf(input$subPlatform)))
     }
 
     rv$sub$serialnumber <- input$subSerialnumber   
     if (!is.null(input$subSerialnumber)) {
-      filterChain <- append(filterChain, paste0("serialnumber %in% '", input$subSerialnumber, "'")) 
+      filterChain <- append(filterChain, paste0("serialnumber %in% ", cf(input$subSerialnumber)))
     }
 
     rv$sub$gear <- input$subGear
     if (!is.null(input$subGear)) {
-      filterChain <- append(filterChain, paste0("gear %in% '", input$subGear, "'"))
+      filterChain <- append(filterChain, paste0("gear %in% ", cf(input$subGear)))
     }
 
     if (!identical(as.numeric(input$subLon), c(rv$all$min.lon, rv$all$max.lon))) {
@@ -925,6 +934,7 @@ obsPopulatePanel <- function() {
     
     # Check whether there is a subset?
     if(length(filterChain) > 0) {
+	    print(filterChain)
 	    filterChain <- paste(filterChain, collapse = " & ")
 	    rv$substart <- TRUE
 
