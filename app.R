@@ -348,7 +348,7 @@ body <-
                                     
                                     selectizeInput(inputId = "selCruiseSeriesDb", 
                                                    label = "Cruise series:",
-                                                   choices = "Not implemented yet", multiple = TRUE),
+                                                   choices = NULL, multiple = TRUE),
                                     
                                     selectizeInput(inputId = "selCruiseDb", 
                                                    label = "Cruise number:",
