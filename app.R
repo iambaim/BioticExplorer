@@ -97,7 +97,7 @@ individualOverviewFigureList <- list("Length distribution of species" = "indLeng
 
 speciesFigureList <- list("Length-weight" = "lwPlot", "Growth" = "laPlot", "Maturity" = "l50Plot", "Sex ratio map" = "sexRatioMap", "Length distribution map" = "sizeDistributionMap", "Length/sex disrtibution" = "lengthDistributionPlot", "Length/stage distribution" = "stageDistributionPlot")
 
-dbPath <- "/data/duckdb/newdb.monetdb"
+dbPath <- "/data/duckdb/IMR_db.monetdb"
 dbIndexPath <- "/data/duckdb/dbIndex.rda"
 if(file.exists(dbPath)) {
   message("dbPath found. Enabling server version.")
