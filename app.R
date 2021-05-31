@@ -1,6 +1,6 @@
 ## Set the database alternative ("local" for locally run MonetDB, "server" for the MonetDB on Eucleia, "desktop" for no database connection)
 
-dbType <- "local"
+dbType <- "server"
 
 ## Libraries required to run the app ####
 
